@@ -395,4 +395,525 @@ function renderHome(settings, isAdmin) {
                   thumb.appendChild(im);
 
                   var info = document.createElement('div');
-                  inf
+                  info.className = 'flex-1 w-full space-y-2.5';
+                  var head = document.createElement('div');
+                  head.className = 'flex items-center justify-between gap-2';
+                  var name = document.createElement('div');
+                  name.className = 'text-sm font-semibold text-white truncate';
+                  name.textContent = data.original_name;
+                  var badge = document.createElement('a');
+                  badge.href = data.viewer_url; badge.target = '_blank';
+                  badge.className = 'text-xs text-indigo-300 hover:underline shrink-0';
+                  badge.textContent = 'Open Viewer →';
+                  head.appendChild(name); head.appendChild(badge);
+
+                  info.appendChild(head);
+                  info.appendChild(makeLinkRow('Direct URL', data.direct_url));
+                  info.appendChild(makeLinkRow('Viewer URL', data.viewer_url));
+                  info.appendChild(makeLinkRow('HTML Embed', '<img src="' + data.direct_url + '" alt="' + data.original_name + '" />'));
+                  info.appendChild(makeLinkRow('Markdown', '![' + data.original_name + '](' + data.direct_url + ')'));
+                  card.appendChild(thumb); card.appendChild(info);
+                  results.prepend(card);
+                }
+              })();
+            </script>`
+      }
+    </div>`;
+  return layoutHtml({ title: 'Upload Images', siteName: settings.site_name, isAdmin, body });
+}
+
+function renderViewer(img, origin, settings, isAdmin) {
+  const directUrl = `${origin}/i/${img.filename}`;
+  const viewerUrl = `${origin}/v/${img.id}`;
+  const links = [
+    ['Direct Image URL', directUrl],
+    ['Viewer Page URL', viewerUrl],
+    ['HTML Code', `<img src="${directUrl}" alt="${img.original_name}" />`],
+    ['Markdown', `![${img.original_name}](${directUrl})`],
+    ['BBCode', `[img]${directUrl}[/img]`],
+  ];
+  const body = `
+    <div class="max-w-4xl mx-auto space-y-6">
+      <div class="glass rounded-2xl p-4 sm:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div>
+            <h1 class="text-xl font-bold text-white break-all">${escapeHtml(img.original_name)}</h1>
+            <div class="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-1">
+              <span>${escapeHtml(img.mime_type)}</span><span>•</span>
+              <span>${formatBytes(img.size_bytes)}</span><span>•</span>
+              <span>${img.views} views</span><span>•</span>
+              <span>${new Date(img.created_at).toLocaleDateString()}</span>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <a href="${directUrl}" download="${escapeHtml(img.original_name)}" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white">Download</a>
+            <a href="${directUrl}" target="_blank" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-semibold text-slate-200">Raw Image ↗</a>
+          </div>
+        </div>
+        <div class="rounded-xl bg-black/50 border border-white/10 p-3 flex items-center justify-center min-h-[260px]">
+          <img src="${directUrl}" alt="${escapeHtml(img.original_name)}" class="max-h-[70vh] w-auto rounded-lg object-contain" />
+        </div>
+      </div>
+      <div class="glass rounded-2xl p-5 space-y-3">
+        <h2 class="text-sm font-semibold text-slate-200 mb-2">Embed & Share Links</h2>
+        ${links
+          .map(
+            ([label, val]) => `
+          <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+            <span class="sm:w-36 text-xs text-slate-400 shrink-0">${label}</span>
+            <div class="flex-1 flex gap-2">
+              <input type="text" readonly value="${escapeHtml(val)}" onclick="this.select()" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none" />
+              <button type="button" data-copy="${escapeHtml(val)}" onclick="cpVal(this)" class="px-3.5 py-2 rounded-lg bg-white/10 hover:bg-indigo-600 text-xs font-medium text-white shrink-0">Copy</button>
+            </div>
+          </div>`
+          )
+          .join('')}
+      </div>
+    </div>
+    <script>
+      function cpVal(btn) {
+        navigator.clipboard.writeText(btn.getAttribute('data-copy'));
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+      }
+    </script>`;
+  return layoutHtml({ title: img.original_name, siteName: settings.site_name, isAdmin, body });
+}
+
+function renderLogin(settings, errorMsg = '') {
+  const body = `
+    <div class="max-w-md mx-auto mt-12">
+      <div class="glass rounded-2xl p-8 shadow-2xl">
+        <h1 class="text-2xl font-bold text-center mb-2">Admin Login</h1>
+        <p class="text-slate-400 text-xs text-center mb-6">Enter your admin password to manage images, settings, and API keys.</p>
+        ${errorMsg ? `<div class="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">${escapeHtml(errorMsg)}</div>` : ''}
+        <form method="POST" action="/api/admin/login" class="space-y-4">
+          <input type="password" name="password" required autofocus placeholder="Admin Password" class="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500" />
+          <button type="submit" class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-semibold text-sm text-white">Unlock Dashboard</button>
+        </form>
+      </div>
+    </div>`;
+  return layoutHtml({ title: 'Admin Login', siteName: settings.site_name, isAdmin: false, body });
+}
+
+function renderAdmin(settings, origin) {
+  const body = `
+    <div class="space-y-6">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 class="text-2xl font-bold">Admin Dashboard</h1>
+          <p class="text-xs text-slate-400">Manage images, storage quota, settings, and your own upload API keys.</p>
+        </div>
+        <div class="flex gap-2">
+          <a href="/" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white">+ Upload</a>
+          <form method="POST" action="/api/admin/logout"><button type="submit" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-rose-500/20 text-xs font-semibold text-slate-300">Logout</button></form>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="glass rounded-2xl p-5"><p class="text-xs text-slate-400">Total Images</p><p id="statCount" class="text-2xl font-bold mt-1">—</p></div>
+        <div class="glass rounded-2xl p-5"><p class="text-xs text-slate-400">Storage Used (10 GB Free)</p><p id="statStorage" class="text-2xl font-bold mt-1">—</p></div>
+        <div class="glass rounded-2xl p-5"><p class="text-xs text-slate-400">Total Viewer Hits</p><p id="statViews" class="text-2xl font-bold mt-1">—</p></div>
+      </div>
+
+      <div class="flex gap-2 border-b border-white/10 pb-3">
+        <button type="button" onclick="switchTab('gallery')" id="tab-gallery" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white">Images Gallery</button>
+        <button type="button" onclick="switchTab('api')" id="tab-api" class="px-4 py-2 rounded-xl text-xs font-semibold bg-white/5 text-slate-300">API Keys & Docs</button>
+        <button type="button" onclick="switchTab('settings')" id="tab-settings" class="px-4 py-2 rounded-xl text-xs font-semibold bg-white/5 text-slate-300">Site Settings</button>
+      </div>
+
+      <section id="panel-gallery" class="space-y-4">
+        <div class="flex gap-2">
+          <input id="searchInput" type="text" placeholder="Search by filename or ID..." class="w-full sm:w-80 bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-white" />
+          <button type="button" onclick="loadImages()" class="px-4 py-2 rounded-xl bg-white/10 text-xs font-semibold">Search</button>
+        </div>
+        <div id="galleryGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div>
+      </section>
+
+      <section id="panel-api" class="hidden space-y-6">
+        <div class="glass rounded-2xl p-5 space-y-4">
+          <h2 class="text-base font-bold">Generate New API Key</h2>
+          <div class="flex flex-wrap gap-2">
+            <input id="newKeyName" type="text" placeholder="e.g., My App / Website" class="flex-1 min-w-[220px] bg-black/40 border border-white/15 rounded-xl px-4 py-2 text-sm text-white" />
+            <button type="button" onclick="createKey()" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white">Generate Key</button>
+          </div>
+          <div id="keysList" class="space-y-2 pt-2"></div>
+        </div>
+        <div class="glass rounded-2xl p-5 space-y-3">
+          <h2 class="text-base font-bold">Your Upload API Usage (ImgBB Style)</h2>
+          <p class="text-xs text-slate-400">Endpoint: <code class="text-indigo-300 font-mono">POST ${escapeHtml(origin)}/api/v1/upload?key=YOUR_API_KEY</code></p>
+          <pre class="bg-black/60 border border-white/10 rounded-xl p-4 text-xs font-mono text-sky-300 overflow-x-auto">const fd = new FormData();
+fd.append('image', fileInput.files[0]);
+const res = await fetch('${escapeHtml(origin)}/api/v1/upload?key=YOUR_API_KEY', {
+  method: 'POST',
+  body: fd
+});
+const data = await res.json();
+// data.data.direct_url  &  data.data.viewer_url</pre>
+        </div>
+      </section>
+
+      <section id="panel-settings" class="hidden">
+        <div class="glass rounded-2xl p-6 max-w-xl space-y-4">
+          <h2 class="text-base font-bold">Website Settings</h2>
+          <div><label class="block text-xs text-slate-400 mb-1">Site Name</label><input id="setSiteName" type="text" value="${escapeHtml(settings.site_name)}" class="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white" /></div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Public Upload</label>
+            <select id="setPublicUpload" class="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white">
+              <option value="0" ${settings.public_upload === '0' ? 'selected' : ''}>Private (Only Admin & API Keys)</option>
+              <option value="1" ${settings.public_upload === '1' ? 'selected' : ''}>Public (Anyone can upload)</option>
+            </select>
+          </div>
+          <div><label class="block text-xs text-slate-400 mb-1">Max File Size (MB)</label><input id="setMaxSize" type="number" min="1" max="50" value="${escapeHtml(settings.max_size_mb)}" class="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white" /></div>
+          <div><label class="block text-xs text-slate-400 mb-1">Allowed MIME Types</label><input id="setMimes" type="text" value="${escapeHtml(settings.allowed_mimes)}" class="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-2.5 text-xs font-mono text-white" /></div>
+          <button type="button" onclick="saveSettings()" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white">Save Settings</button>
+          <span id="settingsMsg" class="text-xs text-emerald-400 ml-3"></span>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      function fmtBytes(b) {
+        if (!b) return '0 B';
+        var u = ['B','KB','MB','GB'], i = Math.floor(Math.log(b)/Math.log(1024));
+        return (b/Math.pow(1024, i)).toFixed(2) + ' ' + u[i];
+      }
+      function switchTab(name) {
+        ['gallery','api','settings'].forEach(function(t) {
+          document.getElementById('panel-' + t).classList.toggle('hidden', t !== name);
+          document.getElementById('tab-' + t).className = t === name ? 'px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white' : 'px-4 py-2 rounded-xl text-xs font-semibold bg-white/5 text-slate-300';
+        });
+        if (name === 'api') loadKeys();
+      }
+      async function loadImages() {
+        var q = document.getElementById('searchInput').value || '';
+        var res = await fetch('/api/admin/images?q=' + encodeURIComponent(q));
+        var data = await res.json();
+        document.getElementById('statCount').textContent = data.total;
+        document.getElementById('statStorage').textContent = fmtBytes(data.totalBytes);
+        document.getElementById('statViews').textContent = data.totalViews;
+        var grid = document.getElementById('galleryGrid');
+        grid.innerHTML = '';
+        if (!data.images.length) { grid.innerHTML = '<p class="col-span-full text-sm text-slate-500 py-10 text-center">No images found.</p>'; return; }
+        data.images.forEach(function(img) {
+          var directUrl = window.location.origin + '/i/' + img.filename;
+          var card = document.createElement('div'); card.className = 'glass rounded-xl overflow-hidden flex flex-col';
+          var a = document.createElement('a'); a.href = '/v/' + img.id; a.target = '_blank'; a.className = 'h-40 bg-black/50 block overflow-hidden';
+          var im = document.createElement('img'); im.src = directUrl; im.loading = 'lazy'; im.className = 'w-full h-full object-cover';
+          a.appendChild(im);
+          var meta = document.createElement('div'); meta.className = 'p-3 space-y-2 flex-1 flex flex-col justify-between';
+          var t = document.createElement('div'); t.className = 'text-xs font-medium text-white truncate'; t.textContent = img.original_name;
+          var s = document.createElement('div'); s.className = 'text-[11px] text-slate-400'; s.textContent = fmtBytes(img.size_bytes) + ' • ' + img.source;
+          var act = document.createElement('div'); act.className = 'flex gap-1.5 pt-1';
+          var cp = document.createElement('button'); cp.className = 'flex-1 py-1.5 rounded-lg bg-white/10 hover:bg-indigo-600 text-[11px]'; cp.textContent = 'Copy URL';
+          cp.onclick = function() { navigator.clipboard.writeText(directUrl); cp.textContent = 'Copied!'; setTimeout(function(){ cp.textContent='Copy URL'; }, 1200); };
+          var del = document.createElement('button'); del.className = 'px-2.5 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white text-[11px]'; del.textContent = 'Delete';
+          del.onclick = async function() { if (!confirm('Delete permanently?')) return; await fetch('/api/admin/images/' + img.id, { method: 'DELETE' }); loadImages(); };
+          act.appendChild(cp); act.appendChild(del); meta.appendChild(t); meta.appendChild(s); meta.appendChild(act);
+          card.appendChild(a); card.appendChild(meta); grid.appendChild(card);
+        });
+      }
+      async function loadKeys() {
+        var res = await fetch('/api/admin/keys'); var data = await res.json();
+        var list = document.getElementById('keysList'); list.innerHTML = '';
+        if (!data.keys.length) { list.innerHTML = '<p class="text-xs text-slate-500">No API keys yet.</p>'; return; }
+        data.keys.forEach(function(k) {
+          var row = document.createElement('div'); row.className = 'flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-black/40 border border-white/10';
+          var left = document.createElement('div');
+          var n = document.createElement('div'); n.className = 'text-xs font-semibold text-white'; n.textContent = k.name + ' (' + k.upload_count + ' uploads)';
+          var v = document.createElement('div'); v.className = 'text-[11px] font-mono text-indigo-300 mt-0.5'; v.textContent = k.api_key;
+          left.appendChild(n); left.appendChild(v);
+          var btns = document.createElement('div'); btns.className = 'flex gap-2';
+          var cp = document.createElement('button'); cp.className = 'px-3 py-1.5 rounded-lg bg-white/10 hover:bg-indigo-600 text-xs'; cp.textContent = 'Copy';
+          cp.onclick = function() { navigator.clipboard.writeText(k.api_key); cp.textContent = 'Copied!'; setTimeout(function(){ cp.textContent='Copy'; }, 1200); };
+          var rm = document.createElement('button'); rm.className = 'px-3 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-600 text-rose-300 text-xs'; rm.textContent = 'Revoke';
+          rm.onclick = async function() { if (!confirm('Revoke key?')) return; await fetch('/api/admin/keys/' + k.id, { method: 'DELETE' }); loadKeys(); };
+          btns.appendChild(cp); btns.appendChild(rm); row.appendChild(left); row.appendChild(btns); list.appendChild(row);
+        });
+      }
+      async function createKey() {
+        var name = document.getElementById('newKeyName').value.trim() || 'App Key';
+        await fetch('/api/admin/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name }) });
+        document.getElementById('newKeyName').value = ''; loadKeys();
+      }
+      async function saveSettings() {
+        var res = await fetch('/api/admin/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            site_name: document.getElementById('setSiteName').value.trim(),
+            public_upload: document.getElementById('setPublicUpload').value,
+            max_size_mb: document.getElementById('setMaxSize').value,
+            allowed_mimes: document.getElementById('setMimes').value.trim()
+          })
+        });
+        var msg = document.getElementById('settingsMsg');
+        msg.textContent = res.ok ? 'Saved!' : 'Error';
+        setTimeout(function(){ msg.textContent = ''; }, 2000);
+      }
+      document.getElementById('searchInput').onkeydown = function(e) { if (e.key === 'Enter') loadImages(); };
+      loadImages();
+    </script>`;
+  return layoutHtml({ title: 'Dashboard', siteName: settings.site_name, isAdmin: true, body });
+}
+
+// ---------- Main Router ----------
+export default {
+  async fetch(request, env, ctx) {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const origin = url.origin;
+
+    try {
+      // 1. Home
+      if (path === '/' && request.method === 'GET') {
+        const settings = await getSettings(env.DB);
+        return htmlRes(renderHome(settings, await isAdminReq(request, env)));
+      }
+
+      // 2. Direct Image Route (/i/filename)
+      if (path.startsWith('/i/') && request.method === 'GET') {
+        const filename = path.slice(3);
+        if (!filename) return new Response('Not found', { status: 404 });
+
+        const cacheKey = new Request(url.toString(), { method: 'GET' });
+        const cache = caches.default;
+        const cached = await cache.match(cacheKey);
+        if (cached) return cached;
+
+        const record = await env.DB.prepare('SELECT * FROM images WHERE filename = ?').bind(filename).first();
+        if (!record) return new Response('Image not found', { status: 404 });
+
+        const b2Res = await b2SignedFetch(env, 'GET', filename);
+        if (!b2Res.ok || !b2Res.body) return new Response('Image unavailable', { status: 404 });
+
+        const headers = new Headers();
+        headers.set('Content-Type', record.mime_type);
+        headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+        headers.set('Access-Control-Allow-Origin', '*');
+        headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
+        headers.set('Content-Security-Policy', 'sandbox');
+
+        const res = new Response(b2Res.body, { status: 200, headers });
+        ctx.waitUntil(cache.put(cacheKey, res.clone()));
+        return res;
+      }
+
+      // 3. Viewer Page (/v/id)
+      if (path.startsWith('/v/') && request.method === 'GET') {
+        const id = path.slice(3);
+        const img = await env.DB.prepare('SELECT * FROM images WHERE id = ?').bind(id).first();
+        if (!img) return new Response('Image not found', { status: 404 });
+        ctx.waitUntil(env.DB.prepare('UPDATE images SET views = views + 1 WHERE id = ?').bind(id).run());
+        const settings = await getSettings(env.DB);
+        return htmlRes(renderViewer(img, origin, settings, await isAdminReq(request, env)));
+      }
+
+      // 4. Upload API (Web + External ImgBB-style API)
+      if (path === '/api/v1/upload' && request.method === 'POST') {
+        const settings = await getSettings(env.DB);
+        const isAdmin = await isAdminReq(request, env);
+        const authHeader = request.headers.get('authorization') || '';
+        const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+        let providedKey = request.headers.get('x-api-key') || bearer || url.searchParams.get('key') || '';
+
+        let authorized = isAdmin || settings.public_upload === '1';
+        let source = 'web';
+
+        const verifyKey = async (k) => {
+          const row = await env.DB.prepare('SELECT id FROM api_keys WHERE api_key = ?').bind(k).first();
+          if (!row) return false;
+          await env.DB.prepare('UPDATE api_keys SET upload_count = upload_count + 1, last_used_at = ? WHERE id = ?')
+            .bind(new Date().toISOString(), row.id)
+            .run();
+          return true;
+        };
+
+        if (providedKey) {
+          if (!(await verifyKey(providedKey))) return jsonRes({ success: false, status: 401, error: 'Invalid API key' }, 401);
+          authorized = true;
+          source = 'api';
+        }
+
+        let bytes, mimeType = '', originalName = 'image.png';
+        const ctype = request.headers.get('content-type') || '';
+
+        if (ctype.includes('multipart/form-data')) {
+          const form = await request.formData();
+          const formKey = form.get('key');
+          if (!providedKey && typeof formKey === 'string' && formKey) {
+            if (!(await verifyKey(formKey))) return jsonRes({ success: false, status: 401, error: 'Invalid API key' }, 401);
+            authorized = true;
+            source = 'api';
+          }
+          if (!authorized) return jsonRes({ success: false, status: 401, error: 'Unauthorized' }, 401);
+
+          const file = form.get('image');
+          if (!file || typeof file === 'string') return jsonRes({ success: false, status: 400, error: 'Missing image file' }, 400);
+          originalName = file.name || 'upload.png';
+          mimeType = file.type;
+          bytes = new Uint8Array(await file.arrayBuffer());
+        } else if (ctype.includes('application/json')) {
+          if (!authorized) return jsonRes({ success: false, status: 401, error: 'Unauthorized' }, 401);
+          const body = await request.json();
+          if (!body.image) return jsonRes({ success: false, status: 400, error: 'Missing image base64' }, 400);
+          let b64 = body.image;
+          const m = b64.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
+          if (m) { mimeType = m[1]; b64 = m[2]; } else { mimeType = 'image/png'; }
+          originalName = body.name || `upload.${MIME_EXT_MAP[mimeType] || 'png'}`;
+          bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        } else {
+          return jsonRes({ success: false, status: 400, error: 'Use multipart/form-data or application/json' }, 400);
+        }
+
+        const allowed = settings.allowed_mimes.split(',').map((s) => s.trim().toLowerCase());
+        if (!allowed.includes((mimeType || '').toLowerCase())) {
+          return jsonRes({ success: false, status: 400, error: `Unsupported image type: ${mimeType}` }, 400);
+        }
+        const maxBytes = Number(settings.max_size_mb || '15') * 1024 * 1024;
+        if (!bytes.byteLength || bytes.byteLength > maxBytes) {
+          return jsonRes({ success: false, status: 400, error: `Max size is ${settings.max_size_mb} MB` }, 400);
+        }
+
+        const id = randomId(8);
+        const ext = MIME_EXT_MAP[mimeType.toLowerCase()] || 'png';
+        const filename = `${id}.${ext}`;
+        const deleteToken = randomSecret('del_');
+        const createdAt = new Date().toISOString();
+
+        const putRes = await b2SignedFetch(env, 'PUT', filename, bytes, mimeType);
+        if (!putRes.ok) {
+          return jsonRes({ success: false, status: 500, error: `Storage error (${putRes.status}): ${await putRes.text()}` }, 500);
+        }
+
+        await env.DB.prepare(
+          'INSERT INTO images (id, filename, original_name, mime_type, size_bytes, delete_token, source, views, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)'
+        ).bind(id, filename, originalName, mimeType, bytes.byteLength, deleteToken, source, createdAt).run();
+
+        return jsonRes({
+          success: true,
+          status: 200,
+          data: {
+            id,
+            filename,
+            original_name: originalName,
+            mime: mimeType,
+            size: bytes.byteLength,
+            direct_url: `${origin}/i/${filename}`,
+            viewer_url: `${origin}/v/${id}`,
+            delete_url: `${origin}/api/v1/delete/${id}?token=${deleteToken}`,
+            created_at: createdAt,
+          },
+        });
+      }
+
+      // 5. Token Delete API
+      if (path.startsWith('/api/v1/delete/')) {
+        const id = path.slice('/api/v1/delete/'.length);
+        const token = url.searchParams.get('token');
+        const img = await env.DB.prepare('SELECT * FROM images WHERE id = ?').bind(id).first();
+        if (!img) return jsonRes({ success: false, error: 'Not found' }, 404);
+        if (!token || token !== img.delete_token) return jsonRes({ success: false, error: 'Invalid token' }, 403);
+        await b2SignedFetch(env, 'DELETE', img.filename);
+        await env.DB.prepare('DELETE FROM images WHERE id = ?').bind(id).run();
+        return jsonRes({ success: true });
+      }
+
+      // 6. Admin Login / Logout / Dashboard
+      if (path === '/admin' && request.method === 'GET') {
+        const settings = await getSettings(env.DB);
+        if (!(await isAdminReq(request, env))) return htmlRes(renderLogin(settings));
+        return htmlRes(renderAdmin(settings, origin));
+      }
+
+      if (path === '/api/admin/login' && request.method === 'POST') {
+        const form = await request.formData();
+        const pass = form.get('password');
+        const settings = await getSettings(env.DB);
+        if (typeof pass !== 'string' || pass !== (env.ADMIN_PASSWORD || '').trim()) {
+          return htmlRes(renderLogin(settings, 'Wrong password!'), 401);
+        }
+        const token = await createSessionToken(pass);
+        return new Response(null, {
+          status: 302,
+          headers: { Location: '/admin', 'Set-Cookie': buildCookie(token, 60 * 60 * 24 * 7) },
+        });
+      }
+
+      if (path === '/api/admin/logout' && request.method === 'POST') {
+        return new Response(null, {
+          status: 302,
+          headers: { Location: '/admin', 'Set-Cookie': buildCookie('', 0) },
+        });
+      }
+
+      // Admin Protected APIs
+      if (path.startsWith('/api/admin/')) {
+        if (!(await isAdminReq(request, env))) return jsonRes({ error: 'Unauthorized' }, 401);
+
+        if (path === '/api/admin/images' && request.method === 'GET') {
+          const q = (url.searchParams.get('q') || '').trim();
+          const listRes = q
+            ? await env.DB.prepare('SELECT * FROM images WHERE original_name LIKE ? OR id LIKE ? ORDER BY created_at DESC LIMIT 60').bind(`%${q}%`, `%${q}%`).all()
+            : await env.DB.prepare('SELECT * FROM images ORDER BY created_at DESC LIMIT 60').all();
+          const stats = await env.DB.prepare('SELECT COUNT(*) as total, COALESCE(SUM(size_bytes),0) as totalBytes, COALESCE(SUM(views),0) as totalViews FROM images').first();
+          return jsonRes({ images: listRes.results, total: stats.total || 0, totalBytes: stats.totalBytes || 0, totalViews: stats.totalViews || 0 });
+        }
+
+        if (path.startsWith('/api/admin/images/') && request.method === 'DELETE') {
+          const id = path.slice('/api/admin/images/'.length);
+          const img = await env.DB.prepare('SELECT * FROM images WHERE id = ?').bind(id).first();
+          if (!img) return jsonRes({ error: 'Not found' }, 404);
+          await b2SignedFetch(env, 'DELETE', img.filename);
+          await env.DB.prepare('DELETE FROM images WHERE id = ?').bind(id).run();
+          return jsonRes({ success: true });
+        }
+
+        if (path === '/api/admin/keys' && request.method === 'GET') {
+          const res = await env.DB.prepare('SELECT * FROM api_keys ORDER BY created_at DESC').all();
+          return jsonRes({ keys: res.results });
+        }
+
+        if (path === '/api/admin/keys' && request.method === 'POST') {
+          const body = await request.json();
+          const id = randomId(8);
+          const apiKey = randomSecret('pv_key_');
+          await env.DB.prepare('INSERT INTO api_keys (id, name, api_key, upload_count, created_at) VALUES (?, ?, ?, 0, ?)')
+            .bind(id, (body.name || 'My App').slice(0, 50), apiKey, new Date().toISOString())
+            .run();
+          return jsonRes({ success: true, apiKey });
+        }
+
+        if (path.startsWith('/api/admin/keys/') && request.method === 'DELETE') {
+          const id = path.slice('/api/admin/keys/'.length);
+          await env.DB.prepare('DELETE FROM api_keys WHERE id = ?').bind(id).run();
+          return jsonRes({ success: true });
+        }
+
+        if (path === '/api/admin/settings' && request.method === 'PUT') {
+          const body = await request.json();
+          const updates = [
+            ['site_name', body.site_name || 'PixelVault'],
+            ['public_upload', body.public_upload === '1' ? '1' : '0'],
+            ['max_size_mb', String(body.max_size_mb || '15')],
+            ['allowed_mimes', String(body.allowed_mimes || 'image/jpeg,image/png,image/webp,image/gif')],
+          ];
+          await env.DB.batch(
+            updates.map(([k, v]) =>
+              env.DB.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').bind(k, v)
+            )
+          );
+          return jsonRes({ success: true });
+        }
+      }
+
+      return new Response('Not Found', { status: 404 });
+    } catch (err) {
+      return jsonRes({ success: false, error: err.message || 'Server error' }, 500);
+    }
+  },
+};
