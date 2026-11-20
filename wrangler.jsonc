@@ -1,0 +1,16 @@
+{
+  "name": "your-worker-name",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-19",
+  "vars": {
+    "B2_ENDPOINT": "s3.us-east-005.backblazeb2.com",
+    "B2_BUCKET": "your-private-bucket-name"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "your-d1-database-name",
+      "database_id": "your-d1-database-id"
+    }
+  ]
+}
