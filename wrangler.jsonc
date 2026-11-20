@@ -9,8 +9,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "your-d1-database-name",
-      "database_id": "your-d1-database-id"
+      "database_name": "codexby",
+      "database_id": "5603b962-ecdc-4ef4-a3c5-72804515f5c5"
     }
   ]
 }
