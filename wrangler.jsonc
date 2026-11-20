@@ -1,5 +1,5 @@
 {
-  "name": "your-worker-name",
+  "name": "codexby",
   "main": "worker.js",
   "compatibility_date": "2026-11-19",
   "vars": {
